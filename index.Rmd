@@ -39,7 +39,8 @@ rm(simd_indicators, simd_zones)
 simd <-
   simd %>%
   mutate(
-    across(simd2020v2_rank:population, ~ as.integer(.)))
+    across(simd2020v2_rank:population, ~ as.integer(.)),
+    emerg = (emerg - 100)/100)
 
 simd_aberdeen <-
   simd %>%
@@ -55,10 +56,10 @@ simd_aberdeen <-
            as_factor(ntile(.$simd2020v2_rank, 100)))
 ```
   
-Aberdeen's median emergency hospital admission rate is `r median(simd_aberdeen$emerg)` (**lower than Scotland's** overall value of 100).  
+Aberdeen's emergency hospital admission rate is **`r median(simd_aberdeen$emerg)*100`% lower than Scotland's** (adjusted for the age and sex of the population).  
 
-However, there are large differences in emergency admissions across the city. **`r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$intermediate_zone`** (zone `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$data_zone`) has the highest admission rate in Aberdeen at `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg`. This means emergency admissions in this area are **`r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg - 100`% higher** than expected given the age and sex breakdown of the population.
-
+However, there are **large differences in emergency admissions across the city**. The emergency admissions rate ranges from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100`% higher than the Scottish average to `r simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*-100`%
+lower. 
 
 ```{r, include=FALSE}
 #select Aberdeen City datazones
@@ -71,17 +72,19 @@ aberdeen_sf <- filter(datazone_sf, DataZone %in% aberdeen_data_zones)
 aberdeen_sf <-
   left_join(aberdeen_sf, simd_aberdeen, by = c("DataZone" = "data_zone"))
 ```
+<br>
 
 ### Mapping Emergency Hospital Admissions
-Heathryfold, Middlefied, Mastrick and Northfield have much higher than expected emergency admission rates.  
+Heathryfold, Middlefied, Mastrick and Northfield have **much higher** emergency admission rates than expected. The Deeside areas have **much lower** emergency admission rates than expected.  
 Hover or click to see area names
 ```{r, echo=FALSE}
 aberdeen_sf %>%
+  select(DataZone, Name, emerg, geometry) %>%
   mapview(
     map.types = "OpenStreetMap",
     zcol = "emerg", 
     label = aberdeen_sf$Name,
-    layer.name = "Emergency Rate",
+    layer.name = "Emergency Admit Rate<br>vs Scotland",
     alpha.regions = 0.75,
     na.label = ""
     )
@@ -94,56 +97,65 @@ vigintile_values <-
   group_by(aberdeen_vigintile) %>%
   summarise(median = median(emerg))
 ```
-  
-### Emergency Hospital Admissions and Socioeconomic Deprivation 
-**Emergency admissions rise as an area's deprivation rises.**  
-Areas in the most deprived 5% of Aberdeen have a median emergency admission rate more than twice that of the least deprived 5%.  
+<br>
+
+### Deprived Areas Need More Emergency Care 
+**Emergency admissions rise steeply as area deprivation rises.**  
 Hover or click to see area names
 ```{r, echo=FALSE}
 q <-
 simd_aberdeen %>%
   ggplot(aes(aberdeen_rank, emerg, label = dz_name)) +
-  geom_hline(yintercept = 100, color = "dark grey", size = 1, alpha = 0.5) +
-  annotate("text", x = 10, y = 85, label = "Scotland\naverage", size = 3) +
+  geom_hline(yintercept = 0, color = "dark grey", size = 1, alpha = 0.5) +
+  annotate("text", x = 10, y = -0.3, label = "Fewer emergencies\nthan expected", size = 3) +
+  annotate("text", x = 250, y = 0.3, label = "More emergencies\nthan expected", size = 3) +
   geom_point(alpha = 0.5, colour = "dark red") +
   scale_x_reverse(breaks = c(1, 100, 200, 300), 
                   labels = c("1\nmost deprived", "100", "200", "300\nleast deprived"), expand = c(0, 30)) +
-  scale_y_continuous(limits = c(0, 200)) +
+  scale_y_continuous(labels = scales::percent) +
   theme(legend.position = "NA",
         plot.margin = margin(1,1,1,1, unit = "cm")) +
   labs(x = "Deprivation Rank", 
-       y = "Emergency Hosptial Admissions") +
+       y = "Emergency Hosptial Admissions\n(difference from Scottish Average)") +
   theme(axis.text = element_text(size = 8),
         axis.title = element_text(size = 12))
 
-ggplotly(q, tooltip = "label") 
+ggplotly(q, tooltip = "label") %>%
+  layout(margin = list(
+    r = 10,
+    l = 1,
+    t = 20,
+    b = 1
+  ))
 ```
-  
-  
-### Data
+<br>
+
+### Data for all Aberdeen Areas
 ```{r, echo=FALSE}
 simd_aberdeen %>%
   select(data_zone, dz_name, emerg, simd2020v2_decile) %>%
   arrange(desc(emerg)) %>%
   gt() %>%
   tab_header(
-    title = "Aberdeen emergency hospital admission rates", 
+    title = "Emergency hospital admissions relative to Scottish average (age-sex adjusted)", 
     subtitle = "All Aberdeen data zones, sorted by highest emergency admissions") %>%
   cols_label(
     data_zone = "Data Zone",
     dz_name = "Name",
-    emerg = "Emergency Hospital Admissions",
+    emerg = "Emergency Admissions",
     simd2020v2_decile = "SIMD decile (lower is more deprived)")  %>%
+    fmt_percent(emerg, decimals = 0) %>%
   tab_options(container.height = 400,
               data_row.padding = 1)
 ```
-  
-  
-  
-### Methods
-This analysis uses emergency admissions to non-psychiatric and non-obstetric NHS hospitals for the four-year period of 2014 to 2017. Data are given for the 283 Scottish Government Data Zones in Aberdeen city. Admission rates are indirectly age and sex standardised and can be compared to the value of 100 for Scotland overall.
+<br>
 
-Data source: Scottish Government Index of Multiple Deprivation (<https://www.gov.scot/collections/scottish-index-of-multiple-deprivation-2020/>)
+### Methods
+This analysis uses emergency admissions to non-psychiatric and non-obstetric NHS hospitals for the four-year period of 2014 to 2017. Data are given for the 283 Scottish Government Data Zones in Aberdeen city. Admission rates are indirectly age and sex standardised and given relative to the expected value for Scotland.
+
+Data source: Scottish Government Index of Multiple Deprivation (data_zone and emerg variables) (<https://www.gov.scot/collections/scottish-index-of-multiple-deprivation-2020/>)
+
+Methodology: <https://www.gov.scot/binaries/content/documents/govscot/publications/statistics/2020/09/simd-2020-technical-notes/documents/simd-2020-technical-notes/simd-2020-technical-notes/govscot%3Adocument/SIMD%2B2020%2Btechnical%2Bnotes.pdf?forceDownload=true>  
 
 Analysis code: <https://github.com/JessButler/emergency_admissions>
 

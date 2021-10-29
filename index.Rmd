@@ -1,9 +1,7 @@
 ---
-title:
+title: "Emergency Hospital Admissions in Aberdeen"
 html_notebook: default
 ---
-
-## Inequalities in Emergency Hospital Admission in Aberdeen
 
 ```{r setup, include=FALSE}
 library(here)
@@ -40,7 +38,7 @@ simd <-
   simd %>%
   mutate(
     across(simd2020v2_rank:population, ~ as.integer(.)),
-    emerg = (emerg - 100)/100)
+    emerg = (emerg/100))
 
 simd_aberdeen <-
   simd %>%
@@ -55,11 +53,14 @@ simd_aberdeen <-
          aberdeen_percentile =
            as_factor(ntile(.$simd2020v2_rank, 100)))
 ```
-  
-Aberdeen's emergency hospital admission rate is **`r median(simd_aberdeen$emerg)*100`% lower than Scotland's** (adjusted for the age and sex of the population).  
 
-However, there are **large differences in emergency admissions across the city**. The emergency admissions rate ranges from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100`% higher than the Scottish average to `r simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*-100`%
-lower. 
+Identifying areas that rely on **emergency** healthcare helps prioritise where to focus **preventative** care. Below is an analysis of emergency hospital admissions across the city of Aberdeen.  
+
+Emergency admissions from 2014-2017 are shown for the 283 neighbourhoods (each with a population of ~750). Admission rates are compared to the Scottish average (always standarised for age and sex characteristics of the neighbourhood).
+
+Emergency hospital admissions in Aberdeen are **`r 100-(median(simd_aberdeen$emerg)*100)`% lower than the Scottish average**.  
+
+However, there are **large inequalities in emergency admissions across the city**. In different neighbourhoods, **emergency admissions rate varies from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100-100`% higher than the Scottish average to `r 100 -(simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*100)`% lower**. 
 
 ```{r, include=FALSE}
 #select Aberdeen City datazones
@@ -75,7 +76,8 @@ aberdeen_sf <-
 <br>
 
 ### Mapping Emergency Hospital Admissions
-Heathryfold, Middlefied, Mastrick and Northfield have **much higher** emergency admission rates than expected. The Deeside areas have **much lower** emergency admission rates than expected.  
+Heathryfold, Middlefied, Mastrick and Northfield have **much higher** emergency admission rates than expected given the age and sex breakdown of the population. The Deeside areas have **much lower** emergency admission rates than expected.  
+<br> 
 Hover or click to see area names
 ```{r, echo=FALSE}
 aberdeen_sf %>%
@@ -84,7 +86,7 @@ aberdeen_sf %>%
     map.types = "OpenStreetMap",
     zcol = "emerg", 
     label = aberdeen_sf$Name,
-    layer.name = "Emergency Admit Rate<br>vs Scotland",
+    layer.name = "Emergency Admissions <br>vs Scottish Average",
     alpha.regions = 0.75,
     na.label = ""
     )
@@ -101,32 +103,32 @@ vigintile_values <-
 
 ### Deprived Areas Need More Emergency Care 
 **Emergency admissions rise steeply as area deprivation rises.**  
+
+This graph shows emergency admission rates for the 283 neighbourhoods in Aberdeen compared to their level of socioeconomic disadvantage (from the Scottish Government's Index of Multiple Deprivation).  
+
 Hover or click to see area names
 ```{r, echo=FALSE}
 q <-
 simd_aberdeen %>%
   ggplot(aes(aberdeen_rank, emerg, label = dz_name)) +
-  geom_hline(yintercept = 0, color = "dark grey", size = 1, alpha = 0.5) +
-  annotate("text", x = 10, y = -0.3, label = "Fewer emergencies\nthan expected", size = 3) +
-  annotate("text", x = 250, y = 0.3, label = "More emergencies\nthan expected", size = 3) +
+  geom_hline(yintercept = 1, color = "dark grey", size = 1, alpha = 0.5) +
+  annotate("text", x = 50, y = 0.3, label = "Fewer emergencies\nthan expected", size = 3) +
+  annotate("text", x = 200, y = 1.6, label = "More emergencies\nthan expected", size = 3) +
+  annotate("text", x = 285, y = 1, label = "Scottish\naverage", size = 3) +
   geom_point(alpha = 0.5, colour = "dark red") +
   scale_x_reverse(breaks = c(1, 100, 200, 300), 
                   labels = c("1\nmost deprived", "100", "200", "300\nleast deprived"), expand = c(0, 30)) +
-  scale_y_continuous(labels = scales::percent) +
+  scale_y_continuous(limits = c(0, 2)) +
   theme(legend.position = "NA",
         plot.margin = margin(1,1,1,1, unit = "cm")) +
   labs(x = "Deprivation Rank", 
-       y = "Emergency Hosptial Admissions\n(difference from Scottish Average)") +
+       y = "Emergency Hosptial Admission Rate\n") +
   theme(axis.text = element_text(size = 8),
         axis.title = element_text(size = 12))
 
 ggplotly(q, tooltip = "label") %>%
   layout(margin = list(
-    r = 10,
-    l = 1,
-    t = 20,
-    b = 1
-  ))
+    r = 10, l = 1, t = 20, b = 1))
 ```
 <br>
 
@@ -137,17 +139,18 @@ simd_aberdeen %>%
   arrange(desc(emerg)) %>%
   gt() %>%
   tab_header(
-    title = "Emergency hospital admissions relative to Scottish average (age-sex adjusted)", 
+    title = "Emergency hospital admissions rate relative to Scottish average (age-sex adjusted)", 
     subtitle = "All Aberdeen data zones, sorted by highest emergency admissions") %>%
   cols_label(
     data_zone = "Data Zone",
     dz_name = "Name",
     emerg = "Emergency Admissions",
-    simd2020v2_decile = "SIMD decile (lower is more deprived)")  %>%
-    fmt_percent(emerg, decimals = 0) %>%
+    simd2020v2_decile = "SIMD decile (lower is more deprived)") %>%
   tab_options(container.height = 400,
               data_row.padding = 1)
 ```
+<br>
+<br>
 <br>
 
 ### Methods

@@ -53,14 +53,15 @@ simd_aberdeen <-
          aberdeen_percentile =
            as_factor(ntile(.$simd2020v2_rank, 100)))
 ```
+<br> 
 
-Identifying areas that rely on **emergency** healthcare helps prioritise where to focus **preventative** care. Below is an analysis of emergency hospital admissions across the city of Aberdeen.  
+Identifying areas that rely on **emergency medical care** helps prioritise where to focus **preventative care**.  
 
-Emergency admissions from 2014-2017 are shown for the 283 neighbourhoods (each with a population of ~750). Admission rates are compared to the Scottish average (always standarised for age and sex characteristics of the neighbourhood).
+Here we look at emergency hospital admissions from 2014-2017 for each neighbourhood in Aberdeen. Admission rates are given relative to the average for Scotland and standarised for age and sex differences in the populations.  
 
-Emergency hospital admissions in Aberdeen are **`r 100-(median(simd_aberdeen$emerg)*100)`% lower than the Scottish average**.  
+Emergency hospital admissions in Aberdeen are **`r 100-(median(simd_aberdeen$emerg)*100)`% lower than the national average**.  
 
-However, there are **large inequalities in emergency admissions across the city**. In different neighbourhoods, **emergency admissions rate varies from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100-100`% higher than the Scottish average to `r 100 -(simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*100)`% lower**. 
+However, there are **large inequalities in emergency admissions across the city**. In different neighbourhoods, the **emergency admissions rate varies from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100-100`% HIGHER than the national average to `r 100 -(simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*100)`% LOWER**. 
 
 ```{r, include=FALSE}
 #select Aberdeen City datazones
@@ -76,7 +77,7 @@ aberdeen_sf <-
 <br>
 
 ### Mapping Emergency Hospital Admissions
-Heathryfold, Middlefied, Mastrick and Northfield have **much higher** emergency admission rates than expected given the age and sex breakdown of the population. The Deeside areas have **much lower** emergency admission rates than expected.  
+High-emergency and low-emergency neighbourhoods cluster together. **Heathryfold, Middlefied, Mastrick and Northfield have much higher emergency admission rates** than expected given the age and sex breakdown of the population. **Deeside areas have much lower** emergency admission rates than expected.  
 <br> 
 Hover or click to see area names
 ```{r, echo=FALSE}
@@ -112,8 +113,8 @@ q <-
 simd_aberdeen %>%
   ggplot(aes(aberdeen_rank, emerg, label = dz_name)) +
   geom_hline(yintercept = 1, color = "dark grey", size = 1, alpha = 0.5) +
-  annotate("text", x = 50, y = 0.3, label = "Fewer emergencies\nthan expected", size = 3) +
-  annotate("text", x = 200, y = 1.6, label = "More emergencies\nthan expected", size = 3) +
+  # annotate("text", x = 50, y = 0.3, label = "Fewer emergencies\nthan expected", size = 3) +
+  # annotate("text", x = 200, y = 1.6, label = "More emergencies\nthan expected", size = 3) +
   annotate("text", x = 285, y = 1, label = "Scottish\naverage", size = 3) +
   geom_point(alpha = 0.5, colour = "dark red") +
   scale_x_reverse(breaks = c(1, 100, 200, 300), 
@@ -154,7 +155,7 @@ simd_aberdeen %>%
 <br>
 
 ### Methods
-This analysis uses emergency admissions to non-psychiatric and non-obstetric NHS hospitals for the four-year period of 2014 to 2017. Data are given for the 283 Scottish Government Data Zones in Aberdeen city. Admission rates are indirectly age and sex standardised and given relative to the expected value for Scotland.
+This analysis uses emergency admissions to non-psychiatric and non-obstetric NHS hospitals for the four-year period of financial years 2014-2015 to 2017-2018. Data are given for the 283 Scottish Government Data Zones in Aberdeen city (each with a population of about 750). Admission rates are indirectly age-and-sex standardised and given relative to the expected value for Scotland.
 
 Data source: Scottish Government Index of Multiple Deprivation (data_zone and emerg variables) (<https://www.gov.scot/collections/scottish-index-of-multiple-deprivation-2020/>)
 

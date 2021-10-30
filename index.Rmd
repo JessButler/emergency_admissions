@@ -9,6 +9,7 @@ library(tidyverse)
 library(janitor)
 library(sf)
 library(mapview)
+library(broom)
 library(gt)
 library(cowplot)
 library(plotly)
@@ -52,16 +53,26 @@ simd_aberdeen <-
            as_factor(ntile(.$simd2020v2_rank, 20)),
          aberdeen_percentile =
            as_factor(ntile(.$simd2020v2_rank, 100)))
+
+#emerg_rank_model <- lm(emerg ~ aberdeen_rank, simd_aberdeen)
+emerg_rank_model <- 
+  lm(emerg ~ poly(aberdeen_rank, 2), simd_aberdeen)
+
+simd_aberdeen<-
+  simd_aberdeen %>%
+  augment(emerg_rank_model, .) %>%
+  mutate(outlier = case_when(
+    .resid >  1*sd(.$.resid) ~ "higher than expected",
+    .resid < -1*sd(.$.resid) ~ "lower than expected"))
 ```
-<br> 
 
 Identifying areas that rely on **emergency medical care** helps prioritise where to focus **preventative care**.  
 
-Here we look at emergency hospital admissions from 2014-2017 for each neighbourhood in Aberdeen. Admission rates are given relative to the average for Scotland and standarised for age and sex differences in the populations.  
+Here we look at emergency hospital admissions for each neighbourhood in Aberdeen. Admission rates are standarised for age and sex differences between neighbourhoods.  
 
-Emergency hospital admissions in Aberdeen are **`r 100-(median(simd_aberdeen$emerg)*100)`% lower than the national average**.  
+Emergency hospital admissions in Aberdeen are **`r 100-(median(simd_aberdeen$emerg)*100)`% lower than the Scottish average**.  
 
-However, there are **large inequalities in emergency admissions across the city**. In different neighbourhoods, the **emergency admissions rate varies from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100-100`% HIGHER than the national average to `r 100 -(simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*100)`% LOWER**. 
+However, there are **large inequalities in emergency admissions across the city**. In different neighbourhoods, the **emergency admissions rate varies from `r simd_aberdeen %>% arrange(emerg) %>% slice_tail() %>% .$emerg*100-100`% HIGHER than the Scottish average to `r 100 -(simd_aberdeen %>% arrange(emerg) %>% slice_head() %>% .$emerg*100)`% LOWER**. 
 
 ```{r, include=FALSE}
 #select Aberdeen City datazones
@@ -74,6 +85,7 @@ aberdeen_sf <- filter(datazone_sf, DataZone %in% aberdeen_data_zones)
 aberdeen_sf <-
   left_join(aberdeen_sf, simd_aberdeen, by = c("DataZone" = "data_zone"))
 ```
+
 <br>
 
 ### Mapping Emergency Hospital Admissions
@@ -87,22 +99,14 @@ aberdeen_sf %>%
     map.types = "OpenStreetMap",
     zcol = "emerg", 
     label = aberdeen_sf$Name,
-    layer.name = "Emergency Admissions <br>vs Scottish Average",
+    layer.name = "Emergency Admissions <br>vs Scottish Average of 1",
     alpha.regions = 0.75,
     na.label = ""
     )
 ```
-  
-  
-```{r, include=FALSE}
-vigintile_values <-
-  simd_aberdeen %>%
-  group_by(aberdeen_vigintile) %>%
-  summarise(median = median(emerg))
-```
 <br>
 
-### Deprived Areas Need More Emergency Care 
+### Deprived Areas Use More Emergency Care 
 **Emergency admissions rise steeply as area deprivation rises.**  
 
 This graph shows emergency admission rates for the 283 neighbourhoods in Aberdeen compared to their level of socioeconomic disadvantage (from the Scottish Government's Index of Multiple Deprivation).  
@@ -112,9 +116,7 @@ Hover or click to see area names
 q <-
 simd_aberdeen %>%
   ggplot(aes(aberdeen_rank, emerg, label = dz_name)) +
-  geom_hline(yintercept = 1, color = "dark grey", size = 1, alpha = 0.5) +
-  # annotate("text", x = 50, y = 0.3, label = "Fewer emergencies\nthan expected", size = 3) +
-  # annotate("text", x = 200, y = 1.6, label = "More emergencies\nthan expected", size = 3) +
+  geom_hline(yintercept = 1, color = "dark grey", size = 1, alpha = 0.75) +
   annotate("text", x = 285, y = 1, label = "Scottish\naverage", size = 3) +
   geom_point(alpha = 0.5, colour = "dark red") +
   scale_x_reverse(breaks = c(1, 100, 200, 300), 
@@ -125,12 +127,37 @@ simd_aberdeen %>%
   labs(x = "Deprivation Rank", 
        y = "Emergency Hosptial Admission Rate\n") +
   theme(axis.text = element_text(size = 8),
-        axis.title = element_text(size = 12))
+        axis.title = element_text(size = 12)) 
 
 ggplotly(q, tooltip = "label") %>%
   layout(margin = list(
     r = 10, l = 1, t = 20, b = 1))
 ```
+<br>
+
+### Comparing Emergency Admissions in Similar Areas 
+**Within neighbourhoods with equal deprivation, there can be quite different emergency admissions rates**.  
+
+A neighbourhood in George Street has an emergency admission rate `r (1-(simd_aberdeen %>% filter(dz_name == "George Street - 04") %>% .$emerg))*100`% LOWER than the Scottish average. An area with the equal deprivation in Sheddocksley has an emergency admission rate `r (1-(simd_aberdeen %>% filter(dz_name == "Sheddocksley - 01") %>% .$emerg))*-100`% HIGHER than the Scottish average.  
+
+**City centre & Kittybrewster neighbourhoods have lower than expected emergency admission rates given their deprivation**. Northfield & Mastrick areas have higher than expected rates, even given their high level of deprivation. Old Aberdeen and Torry have a mix.
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+aberdeen_sf %>% 
+  select(DataZone, Name, emerg, outlier, geometry) %>%
+  mapview(
+    map.types = "OpenStreetMap",
+    zcol = "outlier", 
+    col.regions = c("red", "dark green"),
+    label = aberdeen_sf$Name,
+    layer.name = md("Emergency Hosptial Admissions,<br>(adjusted for deprivation)"),
+    alpha.regions = 0.75,
+    na.label = "as expected"
+    )
+```
+
+
 <br>
 
 ### Data for all Aberdeen Areas
@@ -164,3 +191,24 @@ Methodology: <https://www.gov.scot/binaries/content/documents/govscot/publicatio
 Analysis code: <https://github.com/JessButler/emergency_admissions>
 
 Author: Jess Butler [jessicabutler\@abdn.ac.uk](mailto:jessicabutler@abdn.ac.uk){.email}
+
+```{r, include=FALSE}
+simd_aberdeen %>%
+  select(dz_name, emerg) %>%
+  arrange(desc(emerg)) %>%
+  slice(1:5, 279:283) %>%
+  gt() %>%
+  cols_label(
+    dz_name = "",
+    emerg = md("**Admission rate<br>compared to Scotland**")) %>%
+  tab_options(container.height = 400,
+              data_row.padding = 1,
+              table.font.size = 12,
+              table.align = "left") %>%
+   tab_row_group(
+    label = md("**Areas with Lowest Emergency Rate**"),
+    rows = 6:10) %>%
+  tab_row_group(
+    label = md("**Areas with Highest Emergency Rate**"),
+    rows = 1:5) 
+```
